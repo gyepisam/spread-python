@@ -1,3 +1,19 @@
+Release 1.7:  changes since release 1.6
+---------------------------------------
+Release date: 2013-01-30
+
+- Updated to work with spread 4.20
+    setup.py
+
+- Added a few new attributes to membership_message
+    changed_member - member name for single member events
+    msg_subtype - allows one to better distinguish message types
+
+- Cleaned up code to populate extra tuple.
+
+- Updated tests
+
+
 Release 1.6:  changes since release 1.5
 ---------------------------------------
 Release date:  2005-MM-DD

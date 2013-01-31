@@ -83,10 +83,15 @@ class SpreadTest(unittest.TestCase):
                          "expected group to have one member")
         self.assertEqual(msg.members[0], mbox.private_group,
                          "expected this mbox to be in group")
-        self.assertEqual(len(msg.extra), 1,
+        self.assertEqual(msg.changed_member, mbox.private_group,
                          "expected one mbox to cause the join")
-        self.assertEqual(msg.extra[0], mbox.private_group,
+        self.assertEqual(msg.changed_member, mbox.private_group,
                          "expected this mbox to cause the join")
+        self.assertEqual(msg.extra[0], mbox.private_group,
+                        "expected extra[0] to be same as private group")
+        self.assertEqual(msg.changed_member, mbox.private_group,
+                         "expected changed_member to be save as private_group")
+
 
         mbox.leave(group)
         # should get a self-leave message
@@ -95,6 +100,7 @@ class SpreadTest(unittest.TestCase):
         self.assertEqual(msg.reason, spread.CAUSED_BY_LEAVE)
         self.assertEqual(len(msg.members), 0)
         self.assertEqual(len(msg.extra), 0)
+        self.assertEqual(msg.changed_member, None)
 
         mbox.disconnect()
 

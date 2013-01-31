@@ -15,8 +15,8 @@
 #     removes build artifacts
 
 # Set this to your favorite Python version.
-PYTHON=python2.1
-ALTPYTHON=python2.2
+PYTHON=python2.7
+ALTPYTHON=python2.6
 
 all:
 	$(PYTHON) setup.py -q build_ext

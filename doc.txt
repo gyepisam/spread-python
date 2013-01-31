@@ -106,13 +106,17 @@ method.  There are no methods.
 
 Instance variables:
 
+    msg_subtype
+        the subtype of the message, which is one of the constants
+            REG_MEMB_MESS
+            TRANSITION_MESS           
+
     reason
-        the message type, which is exactly one of the constants
+        the reason for the message, which is one of the constants
             CAUSED_BY_JOIN
             CAUSED_BY_LEAVE
             CAUSED_BY_DISCONNECT
             CAUSED_BY_NETWORK
-        or zero if this is a transitional membership message
 
     group
         the group to which this message pertains
@@ -125,12 +129,25 @@ Instance variables:
         a list of private names giving the new set of members of the
         group
 
+    changed_member
+        the name of the member that joined, left, or was disconnected.
+        this value is set when the corresponding reason is also set,
+        otherwise it is set to None.
+
     extra
         a list of private names of members that have joined or left
         the group (which it is depends on the reason instance variable).
+        note that this is meant to be used for mass changes such as
+        merges or partitions. To maintain compatibility with previous
+        versions, extra is (sometimes) populated when a single member
+        event occurs.
 
-Note:  for transitional messages (indicated by a reason of zero), the
-members and extra lists are both empty.
+Notes:
+    
+        1. for transitional messages, the members, changed_member, and extra lists are all empty.
+        2. when this member instance leaves a group and receives a leave event on the way out,
+           extra will be empty and changed_member will be None. This is likely a bug in Spread
+           and may change in the future. 
 
 
 Constants

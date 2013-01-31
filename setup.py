@@ -2,16 +2,19 @@
 """ SpreadModule:  Python wrapper for Spread client libraries
 
 This package contains a simple Python wrapper module for the Spread
-toolkit.  The wrapper is known to be compatible with Python 2.3 and 2.4.
+toolkit.  The wrapper is known to be compatible with Python 2.3, 2.4,
+2.6 and 2.7.
 It may work with earlier Pythons, but this has not been tested.
 
 Spread (www.spread.org) is a group communications package.  You'll
 need to download and install it separately.  The Python API has been
-built and tested against Spreads 3.16.1 through 3.17.3, although at
-least Spread 3.17 is required to use this version of the wrapper.
-3.17.3 is recommended.
+built and tested against Spreads 3.16.1 through 3.17.3 and also against
+4.20.
+At least Spread 3.17 is required to use this version of the wrapper.
+4.20 is recommended.
 
 Copyright (c) 2001-2005 Python Software Foundation.  All rights reserved.
+Copyright (c) 2013 Gyepi Sam.
 
 This code is released under the standard PSF license.
 See the file LICENSE.
@@ -64,7 +67,7 @@ else:
     ext = Extension('spread', ['spreadmodule.c'],
                 include_dirs = [SPREAD_DIR + "/include"],
                 library_dirs = [SPREAD_DIR + "/lib"],
-                libraries = ['tspread'],
+                libraries = ['tspread-core'],
                 )
 
 setup(name = "SpreadModule",

@@ -86,10 +86,12 @@ typedef struct {
 typedef struct {
 	PyObject_HEAD
 	int reason;
+  int msg_subtype;
 	PyObject *group;
 	PyObject *group_id;
 	PyObject *members;
 	PyObject *extra; /* that are still members */
+  PyObject *changed_member;
 } MembershipMsg;
 
 typedef struct {
@@ -192,94 +194,115 @@ static PyObject *
 new_membership_msg(int type, PyObject *group, int num_members,
 		   char (*members)[MAX_GROUP_NAME], char *buffer, int size)
 {
-	MembershipMsg *self;
-        int32 num_extra_members;
-        group_id grp_id;
-	/* Although extra_members isn't referenced unless num_extra_members is
-	 * greater than 0, gcc doesn't realize that, so force extra_members to
-	 * be initialized (suppressing a nuisance complaint from the compiler).
-	 */
-	char *extra_members = NULL;
-	int i;
+    MembershipMsg *self;
+    group_id grp_id;
+    membership_info memb_info;
+    int32 num_extra_members = 0;
+    int i;
+    int ret;
 
-	assert(group != NULL);
-	self = PyObject_New(MembershipMsg, &MembershipMsg_Type);
-	if (self == NULL)
-		return NULL;
-	self->reason = type & CAUSED_BY_MASK; /* from sp.h defines */
-	Py_INCREF(group);
-	self->group = group;
-	self->members = NULL;
-	self->extra = NULL;
-	self->group_id = NULL;
-	self->members = PyTuple_New(num_members);
-	if (self->members == NULL) {
-		Py_DECREF(self);
-		return NULL;
-	}
-	for (i = 0; i < num_members; ++i) {
-		PyObject *s = PyString_FromString(members[i]);
-		if (!s) {
-			Py_DECREF(self);
-			return NULL;
-		}
-		PyTuple_SET_ITEM(self->members, i, s);
-	}
+    assert(group != NULL);
+    self = PyObject_New(MembershipMsg, &MembershipMsg_Type);
+    if (self == NULL)
+        return NULL;
+    self->reason = type & CAUSED_BY_MASK; /* from sp.h defines */
+    self->msg_subtype = type & (TRANSITION_MESS | REG_MEMB_MESS);
+    Py_INCREF(group);
+    self->group = group;
+    self->members = NULL;
+    self->extra = NULL;
+    self->group_id = NULL;
+    self->changed_member = NULL;
+    self->members = PyTuple_New(num_members);
+    if (self->members == NULL) {
+        Py_DECREF(self);
+        return NULL;
+    }
+    for (i = 0; i < num_members; ++i) {
+        PyObject *s = PyString_FromString(members[i]);
+        if (!s) {
+            Py_DECREF(self);
+            return NULL;
+        }
+        PyTuple_SET_ITEM(self->members, i, s);
+    }
 
-	num_extra_members = 0;
-	if (SP_get_vs_set_offset_memb_mess() <= size) {
-		/* Pick grp_id and num_extra_members out of the buffer.
-		 * This uses memcpy instead of casting tricks because there's
-		 * no guarantee that the offsets in buffer are properly
-		 * aligned for the type.  Even gcc's memcpy() can produce
-		 * segfaults then, unless the natural type is first cast
-		 * away to char*.
-		 */
-		memcpy((char *)&grp_id,
-		       buffer + SP_get_gid_offset_memb_mess(),
-		       sizeof(grp_id));
-                self->group_id = new_group_id(grp_id);
-		if (self->group_id == NULL) {
-			Py_DECREF(self);
-			return NULL;
-		}
-		memcpy((char *)&num_extra_members,
-		       buffer + SP_get_num_vs_offset_memb_mess(),
-		       sizeof(num_extra_members));
-                extra_members = buffer + SP_get_vs_set_offset_memb_mess();
 
-		if (size - SP_get_vs_set_offset_memb_mess() <
-		    num_extra_members * MAX_GROUP_NAME) {
-			/* SP_receive error (corrupted message). */
-			Py_DECREF(self);
-			PyErr_Format(PyExc_AssertionError,
-				"SP_receive:  a membership message said "
-				"there were %d extra members, but only %d "
-				"bytes remain in the buffer.  Corrupted "
-				"message?",
-			     	num_extra_members,
-			     	size - SP_get_vs_set_offset_memb_mess());
-			return NULL;
-		}
-	}
+    if ((ret = SP_get_memb_info(buffer, type, &memb_info)) < 0) {
+	      PyErr_Format(SpreadError, "error %d on SP_get_memb_info", ret);
+        Py_DECREF(self);
+        return NULL;
+    }
 
-	self->extra = PyTuple_New(num_extra_members);
-	if (self->extra == NULL) {
-		Py_DECREF(self);
-		return NULL;
-	}
-	for (i = 0; i < num_extra_members; i++, extra_members+= MAX_GROUP_NAME) {
-		PyObject *s;
-		/* Spread promises this: */
-		assert(strlen(extra_members) < MAX_GROUP_NAME);
-		s = PyString_FromString(extra_members);
-		if (!s) {
-			Py_DECREF(self);
-			return NULL;
-		}
-		PyTuple_SET_ITEM(self->extra, i, s);
-	}
-	return (PyObject *)self;
+
+    memcpy(&grp_id, &memb_info.gid, sizeof(group_id));
+    self->group_id = new_group_id(grp_id);
+    if (self->group_id == NULL) {
+        Py_DECREF(self);
+        return NULL;
+    }
+
+
+    /* The extra attribute is a tuple initialized for 0 or more items.
+     * If the member event is a single member event such as a join, leave or disconnect,
+     * the changed member attribute is set from memb_info.changed_member
+     * and a single value from vs_set, which is stored inside the message, is added to extra tuple.
+     * If the member event is a merge or partition, the list of member names
+     * from vs_set is stored in extra.
+     */
+
+
+    if (Is_reg_memb_mess(type) && (Is_caused_join_mess(type) || Is_caused_disconnect_mess(type) || Is_caused_leave_mess(type))) {
+        self->changed_member =  PyString_FromString(memb_info.changed_member);
+        if (!self->changed_member) {
+            Py_DECREF(self);
+            return NULL;
+        }
+    }
+    else {
+        self->changed_member = Py_BuildValue("");
+    }
+
+    num_extra_members = memb_info.my_vs_set.num_members;
+
+    self->extra = PyTuple_New(num_extra_members);
+    if (self->extra == NULL) {
+        Py_DECREF(self);
+        return NULL;
+    }
+
+    if (num_extra_members > 0) {
+
+        char (*member_names)[MAX_GROUP_NAME] = (char (*)[MAX_GROUP_NAME]) malloc(num_extra_members * MAX_GROUP_NAME);
+
+        if (member_names == NULL) {
+            Py_DECREF(self);
+            PyErr_NoMemory();
+            return NULL;
+        }
+
+        if ((ret = SP_get_vs_set_members(buffer, &memb_info.my_vs_set, member_names, num_extra_members)) < 0) {
+	          PyErr_Format(SpreadError, "error %d on SP_get_vs_set_members", ret);
+            Py_DECREF(self);
+            free(member_names);
+            return NULL;
+        }
+
+        for (i = 0; i < num_extra_members; i++) {
+            PyObject *s;
+            s = PyString_FromString(member_names[i]);
+            if (!s) {
+                Py_DECREF(self);
+                free(member_names);
+                return NULL;
+            }
+            PyTuple_SET_ITEM(self->extra, i, s);
+        }
+
+        free(member_names);
+    }
+
+    return (PyObject *)self;
 }
 
 static void
@@ -289,6 +312,7 @@ membership_msg_dealloc(MembershipMsg *self)
 	Py_XDECREF(self->members);
 	Py_XDECREF(self->extra);
 	Py_XDECREF(self->group_id);
+  Py_XDECREF(self->changed_member);
 	PyObject_Del(self);
 }
 
@@ -296,10 +320,12 @@ membership_msg_dealloc(MembershipMsg *self)
 
 static struct memberlist MembershipMsg_memberlist[] = {
 	{"reason",	T_INT,		OFF(reason)},
+	{"msg_subtype",	T_INT,		OFF(msg_subtype)},
 	{"group",	T_OBJECT,	OFF(group)},
 	{"group_id",	T_OBJECT,	OFF(group_id)},
 	{"members",	T_OBJECT,	OFF(members)},
 	{"extra",	T_OBJECT,	OFF(extra)},
+	{"changed_member",	T_OBJECT,	OFF(changed_member)},
 	{NULL}
 };
 
@@ -679,7 +705,6 @@ assert_error:
 				      msg_type, endian, data);
 	}
 	else if (Is_membership_mess(svc_type)) {
-		/* XXX Mark transitional messages */
 		msg = new_membership_msg(svc_type, sender,
 					 num_groups, groups,
 					 pbuffer, size);
