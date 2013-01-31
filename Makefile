@@ -35,3 +35,4 @@ clean:
 	$(ALTPYTHON) setup.py clean -a
 	-rm -f *.o *.so
 	-rm -rf build
+	$(RM) *~
