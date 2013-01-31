@@ -1,0 +1,65 @@
+Python Spread Module 1.5
+------------------------
+
+Copyright (c) 2001-2005 Python Software Foundation.  All rights reserved.
+
+This code is released under the standard PSF license.
+See the file LICENSE.
+
+For changes since the last release, see the file CHANGES.
+
+This package contains a simple Python wrapper module for the Spread
+toolkit.  The wrapper is known to be compatible with Pythons in the 2.1,
+2.2 and 2.3 lines.  Light testing has been done with Python 2.4.
+
+Spread (www.spread.org) is a group communications package.  You'll
+need to download and install it separately.  The Python API has been
+built and tested against Spread 3.17.1, 3.17.2, and 3.17.3.  We recommend
+against using versions of Spread earlier than 3.17.1.  Note especially that
+Spreads in the 3.16 line are incompatible with Spreads in the 3.17 line,
+and segfaults in Spread are likely if you try to mix them.
+
+Minimal user documentation for the Python programmer is in doc.txt.
+
+Build instructions for Spread are way down in the Spread Readme.txt
+file; search for "INSTALL".  On Linux, it's as simple as:
+
+    cp LINUX_makefile Makefile
+    make
+
+The Spread makefiles do an odd install, putting things in
+/var/tmp/testinstall by default.  You can force the Makefile to
+install in /usr/local by saying
+
+    make PREFIX=/usr/local install
+
+and that's what we recommend.
+
+The distutils setup.py script needs to be told where the spread code
+is installed.  I still don't know the preferred way to do that, so
+you'll need to edit the SPREAD_DIR constant in the right branch.  The
+setup script assumes you've installed the header files.  Assuming you
+followed the recipe above, including the "make install" part, the
+SPREAD_DIR constant is already set up right and you can do this to
+build the Python wrapper for Spread:
+
+    python setup.py build
+
+The man pages installed by Spread (and available at www.spread.org)
+are fairly helpful, although obscure at times.
+
+To run the testspread.py unit tests, make sure you're Spread daemon is
+running, then just run the script:
+
+    python testspread.py
+
+
+Windows
+=======
+Versions of Spread prior to 3.16.2 suffer many severe Windows-specific
+problems, due to ways in which the Spread source didn't realize sockets
+work differently on Windows (e.g., the C library close() doesn't close
+Windows sockets).
+
+Spread 3.16.2 fixed all the Windows problems we know about.  Earlier
+versions should not be used on Windows.

@@ -1,0 +1,7 @@
+include MANIFEST*
+include README
+include CHANGES
+include LICENSE
+include Makefile
+include *.txt
+include testspread.py

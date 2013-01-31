@@ -1,0 +1,234 @@
+Spread wrapper for Python
+=========================
+
+The spread module is an intentionally thin layer on top of the Spread
+client library.  It defines functions, exceptions, types and
+constants.  For additional documentation, see the Spread man pages,
+especially SP_connect, SP_disconnect, SP_join, SP_leave, SP_multicast,
+SP_receive, and SP_poll.  The Spread website (www.spread.org) gives
+additional information; especially the Spread Users Guide available
+there is helpful.
+
+
+Functions
+---------
+
+connect([daemon[, name[, priority[, membership]]]]) -
+Connect to the Spread daemon and return an object of type MailboxType.
+Upon failure, SpreadError is raised.  See the SP_connect() man page
+for more information.
+
+Arguments:  all arguments are optional, and may be specified by position
+or by keyword:
+
+    daemon
+        a string specifying the port and host of the spread daemon to use,
+        of the form "<port>@<hostname>" where <port> is an integer port
+        number (typically the constant DEFAULT_SPREAD_PORT) represented as
+        a string, and <hostname> specifies the host where the daemon runs,
+        typically "localhost".  The default uses the default Spread port on
+        localhost, typically "4803@localhost".  <hostname> is required on
+        Windows, but <port> alone can be specified on non-Windows systems.
+
+    name
+        a string specifying the private name under which this client is to be
+        known; the default is an empty string, in which case Spread generates
+        a unique private name at random
+
+    priority
+        0 or 1, currently unused; default 0
+
+    membership
+        1 to receive membership messages, and 0 to decline receiving
+        those; default 1
+
+version() - return a triple of integers, (major, minor, patch), as
+returned by Spread's SP_version() function.
+
+
+Exceptions
+----------
+
+SpreadError - The exception raised for Spread-related errors.  The
+arguments are usually a tuple of an int and a string, indicating the
+error constant and the corresponding error message.  Sometimes the
+argument is just a string indicating some higher-level error
+condition.
+
+
+Types
+-----
+
+MailboxType
+
+This object represents a connection to a spread daemon.  Different
+mailboxes are completely independent.  Methods are described below.
+
+Instance variables:
+
+    private_group
+        the private group name assigned to this connection by the spread
+        daemon (see the SP_connect man page).
+
+
+RegularMsgType
+
+This object represents a data message as returned by the receive() method.
+There are no methods.
+
+Instance variables:
+
+    sender
+        the private name of the connection that sent the message
+
+    groups
+        a list of the group names to which the message was multicast
+        (only groups are listed of which the receiving connection is
+        a member)
+
+    message
+        a string giving the data associated with the message
+
+    msg_type
+        an int with the value of the message_type argument passed
+        to multicast() (see the SP_receive manpage; this is a signed
+        16-bit int whose meaning (if any) is wholly up to the
+        application)
+
+    endian
+        an int that is 0 if there are no endian issues with the message
+
+
+MembershipMsgType
+
+This object represents a membership message as returned by the receive()
+method.  There are no methods.
+
+Instance variables:
+
+    reason
+        the message type, which is exactly one of the constants
+            CAUSED_BY_JOIN
+            CAUSED_BY_LEAVE
+            CAUSED_BY_DISCONNECT
+            CAUSED_BY_NETWORK
+        or zero if this is a transitional membership message
+
+    group
+        the group to which this message pertains
+
+    group_id
+        the unique identifier assigned to this group (not a string but
+        an opaque object)
+
+    members
+        a list of private names giving the new set of members of the
+        group
+
+    extra
+        a list of private names of members that have joined or left
+        the group (which it is depends on the reason instance variable).
+
+Note:  for transitional messages (indicated by a reason of zero), the
+members and extra lists are both empty.
+
+
+Constants
+---------
+
+Constants defined by Spread:
+
+LOW_PRIORITY MEDIUM_PRIORITY HIGH_PRIORITY DEFAULT_SPREAD_PORT
+SPREAD_VERSION MAX_GROUP_NAME MAX_PRIVATE_NAME MAX_PROC_NAME
+UNRELIABLE_MESS RELIABLE_MESS FIFO_MESS CAUSAL_MESS AGREED_MESS
+SAFE_MESS REGULAR_MESS SELF_DISCARD DROP_RECV REG_MEMB_MESS
+TRANSITION_MESS CAUSED_BY_JOIN CAUSED_BY_LEAVE CAUSED_BY_DISCONNECT
+CAUSED_BY_NETWORK MEMBERSHIP_MESS ENDIAN_RESERVED RESERVED REJECT_MESS
+ACCEPT_SESSION
+
+Error constants defined by Spread (all negative numbers):
+
+ILLEGAL_SPREAD COULD_NOT_CONNECT REJECT_QUOTA REJECT_NO_NAME
+REJECT_ILLEGAL_NAME REJECT_NOT_UNIQUE REJECT_VERSION CONNECTION_CLOSED
+REJECT_AUTH ILLEGAL_SESSION ILLEGAL_SERVICE ILLEGAL_MESSAGE
+ILLEGAL_GROUP BUFFER_TOO_SHORT GROUPS_TOO_SHORT MESSAGE_TOO_LONG
+
+Constants defined by the Python wrapper:
+
+DEFAULT_BUFFER_SIZE - The initial data buffer size used by receive().
+
+DEFAULT_GROUPS_SIZE - The initial group buffer size used by receive().
+
+
+Methods of MailboxType objects
+------------------------------
+
+All these can raise SpreadError upon Spread-related failures.
+
+disconnect() - Disconnect from the mailbox.  The mailbox object should
+not be used after this call.
+
+fileno() - Return the integer file descriptor for this mailbox
+object.  This can be used for reading in a select() call to check for
+receivable messages.
+
+join(group) - Join the group with the given name.  Return None.
+
+leave(group) - Leave the group with the given name.  Return None.
+
+multicast(service_type, group, message[, message_type=0]) - Send a
+message to all members of a group.  Return the number of bytes sent.
+Arguments:
+
+    service_type
+        one of the integer constants (see the SP_multicast man page
+        for their meaning):
+            UNRELIABLE_MESS
+            RELIABLE_MESS
+            FIFO_MESS
+            CAUSAL_MESS
+            AGREED_MESS
+            SAFE_MESS
+
+    group
+        the name of the group to send to (see multigroup_multicast to send
+        a message to more than one group)
+
+    message
+        the data to be sent, as a Python string
+
+    message_type
+        a signed integer, which should fit in 16 bits; the application
+        can use this for any purpose it likes, or ignore it; see the
+        SP_multicast manpage
+
+multigroup_multicast(service_type, groups, message[, message_type=0]) -
+Send a message to all members of multiple groups.  Return the number of
+bytes sent.
+
+Arguments:
+
+    groups
+        a tuple containing the names of the groups to send to (if there is
+        only one group, consider using multicast() instead)
+
+    service_type
+    message
+    message_type
+        same as for multicast() above
+
+
+receive() - Block (if necessary) until a message is received, and
+return an object representing the received message.  The return value
+is of type RegularMsgType or MembershipMsgType (see above).  The
+caller does not have to worry about buffer sizes; when the underlying
+SP_receive() call fails due to a BUFFER_TOO_SHORT or GROUPS_TOO_SHORT
+error, the Python wrapper method allocates a buffer of the requested
+size and retries the call.
+
+poll() - Return the number of message bytes available for the receive()
+method to read.  If this is 0, a call to receive() will block until a message
+is available.  Warning:  the underlying SP_poll() call returns 0 if Spread
+has disconnected the client (it doesn't give an error return), so polling
+appears mostly unusable in practice.  Passing a mailbox's fileno() to a
+select() call with a timeout is usually more appropriate.

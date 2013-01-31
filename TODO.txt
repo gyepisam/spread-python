@@ -1,0 +1,3 @@
+SpreadModule TODOs
+
+  - Update 'setup.py' to allow '--with-spread'.

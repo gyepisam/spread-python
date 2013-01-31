@@ -1,0 +1,126 @@
+Release 1.6:  changes since release 1.5
+---------------------------------------
+Release date:  2005-MM-DD
+
+- The documentation for ``spread.connect()`` gave incorrect names for the
+  ``daemon`` and ``name`` arguments (important if you want to use them as
+  keyword arguments), and wasn't clear that the hostname portion of the
+  ``daemon`` argument is not optional on Windows.
+
+- The documentation for a mailbox's ``poll()`` method claimed the result
+  was 0 or 1.  It's actually the number of message bytes available to be
+  read by a ``receive()`` call.
+
+
+Release 1.5:  changes since release 1.5b1
+-----------------------------------------
+Release date:  2005-01-25
+
+No changes since 1.5b1.
+
+
+Release 1.5b1:  changes since release 1.5a1
+-------------------------------------------
+
+- Mailbox objects have a new multigroup_multicast() method, wrapping
+  the Spread API's SP_multigroup_multicast() call.  Thanks to Mark McClain
+  for contributing code, docs, and tests for this new feature.
+
+- The C code was changed to suppress a nuisance warning from gcc.
+
+Release 1.5a1:  changes since release 1.4
+-----------------------------------------
+
+- Zope collector issue http://zope.org/Collectors/Zope/1130
+  "spreadmodule.c contains improper use of the 'sizeof' operator"
+
+  Spread membership messages are complicated, and before Spread 3.17 it
+  wasn't actually possible to decode them correctly in all cases.  For
+  example, if the user changed Spread's MAX_PRIVATE_NAME, MAX_PROC_NAME,
+  and MAX_GROUP_NAME #defines, there was no way to guess where various
+  values began in the buffer SP_receive() was given, and segfaults
+  or data loss could occur if you guessed wrong.
+
+  This wasn't entirely fixed until Spread 3.17.2 (Spread itself could
+  still segfault if the user changed these #defines), but at least
+  3.17 introduced 3 new Spread API functions so that clients can determine
+  where fields in the buffer begin.  The Python Spread wrapper module
+  has been updated to use them.
+
+- The module version() function is now documented.
+
+- Changes to the build procedure on Windows for Spread 3.17.3 were
+  incorporated (the names of some Spread files on Windows changed to match
+  the names of corresponding files in non-Windows builds).
+
+
+Release 1.4:  changes since release 1.3
+---------------------------------------
+
+- Added PyPI / Trove metadata to the package.
+
+- Update to require Spread 3.17.1 (library names changed from 'libsp'
+  and 'libtsp' to 'libspread' and 'libtspread').
+
+- Documentation cleanup.
+
+Release 1.3: changes since release 1.2
+--------------------------------------
+
+- Critical bugfix:  We didn't realize that the service_type argument to
+  Spread's SP_receive() is an input parameter as well as an output
+  parameter, and consequently didn't initialize it.  Depending on what
+  trash happened to be sitting on the stack, this could cause Spread to
+  deliberately drop data (a backward compatibility feature in Spread
+  triggered by passing the DROP_RECV flag in service_type on input).
+
+
+Release 1.2: changes since release 1.1
+--------------------------------------
+
+- Changed internal uses of Python's object memory API to stop using
+  macro versions of the names (that worked fine, but was dubious
+  practice for non-core extension modules).
+
+- Changed mbox.disconnect() to be as safe as possible when
+  SPREAD_DISCONNECT_RACE_BUG is not defined.
+
+- Added a test to ensure than the scenario described below doesn't
+  deadlock (two threads in a process sharing an mbox, and one thread
+  doing mbox.receive() waiting for the other thread to do
+  mbox.multicast()).  This test deadlocks with high probability if you
+  define SPREAD_DISCONNECT_RACE_BUG.
+
+- SPREAD_DISCONNECT_RACE_BUG is turned off, although Spread 3.16.2
+  still suffers the insecurity it was guarding against.  Alas, the
+  workaround can cause deadlocks, depending on how the app uses
+  Spread.  See the message thread at:
+
+  http://lists.spread.org/pipermail/spread-users/2002-April/000735.html
+
+  for details.  If, for each mbox, your multithreaded app only does
+  mbox.receive() from a single thread, and always use select() or
+  mbox.poll() before mbox.receive() to ensure that there's a message
+  waiting to be read, you may wish to define SPREAD_DISCONNECT_RACE_BUG
+  when compiling spreadmodule.c.  Defining SPREAD_DISCONNECT_RACE_BUG
+  causes all Spread calls via a given mbox to be serialized, so can
+  cause deadlock if an mbox.receive() waits for a message to be sent
+  by another thread in the same process via the same mbox.
+
+
+Release 1.1: changes since release 1.0
+--------------------------------------
+
+- The README recommend using 3.16.2rc1 or later.
+
+- Using Spread 3.16.2, it now works on Windows.
+
+- Changes to the test suite to make it less accident-prone.
+
+- Fixed race conditions having to do with disconnects in
+  multi-threaded programs.  When one of the errors CONNECTION_CLOSED
+  or ILLEGAL_SESSION is received, mark the mbox as closed.  In
+  addition, use a lock to serialize access to the disconnected flag.
+
+- Fixed a memory leak that leaked about 50 bytes per mbox.receive()
+  call.
